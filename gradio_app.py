@@ -9,7 +9,7 @@ import os
 from datetime import datetime
 
 # 修改模型地址 
-model_path = "/models"
+model_path = "./models"
 encoder = StepAudioTokenizer(f"{model_path}/Step-Audio-Tokenizer")
 tts_engine = StepAudioTTS(f"{model_path}/Step-Audio-TTS-3B", encoder)
 

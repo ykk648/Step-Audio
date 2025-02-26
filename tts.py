@@ -37,6 +37,20 @@ class StepAudioTTS:
         model_path,
         encoder,
     ):
+
+        # load optimus_ths for flash attention, make sure LD_LIBRARY_PATH has `nvidia/cuda_nvrtc/lib`
+        # if not, please manually set LD_LIBRARY_PATH=xxx/python3.10/site-packages/nvidia/cuda_nvrtc/lib
+        try:
+            if torch.__version__ >= "2.5":
+                torch.ops.load_library(os.path.join(model_path, 'lib/liboptimus_ths-torch2.5-cu124.cpython-310-x86_64-linux-gnu.so'))
+            elif torch.__version__ >= "2.3":
+                torch.ops.load_library(os.path.join(model_path, 'lib/liboptimus_ths-torch2.3-cu121.cpython-310-x86_64-linux-gnu.so'))
+            elif torch.__version__ >= "2.2":
+                torch.ops.load_library(os.path.join(model_path, 'lib/liboptimus_ths-torch2.2-cu121.cpython-310-x86_64-linux-gnu.so'))
+            print("Load optimus_ths successfully and flash attn would be enabled")
+        except Exception as err:
+            print(f"Fail to load optimus_ths and flash attn is disabled: {err}")
+
         self.llm = AutoModelForCausalLM.from_pretrained(
             model_path,
             torch_dtype=torch.bfloat16,
@@ -129,7 +143,7 @@ class StepAudioTTS:
     def register_speakers(self):
         self.speakers_info = {}
 
-        with open("speakers/speakers_info.json", "r") as f:
+        with open("speakers/speakers_info.json", "r", encoding="utf-8") as f:
             speakers_info = json.load(f)
 
         for speaker_id, prompt_text in speakers_info.items():
@@ -209,6 +223,9 @@ class StepAudioTTS:
 
     def preprocess_prompt_wav(self, prompt_wav_path : str):
         prompt_wav, prompt_wav_sr = torchaudio.load(prompt_wav_path)
+
+        if prompt_wav.shape[0] > 1:
+            prompt_wav = prompt_wav.mean(dim=0, keepdim=True)  # 将多通道音频转换为单通道
 
         prompt_wav_16k = torchaudio.transforms.Resample(
             orig_freq=prompt_wav_sr, new_freq=16000
